@@ -1,0 +1,55 @@
+uniform sampler2D originalImage;
+uniform sampler2D depthMap;
+uniform float time;
+uniform vec3 userPos;
+uniform float width;
+uniform float height;
+uniform int optionMode;
+attribute vec2 uvs;
+varying vec2 vUv;
+varying float vDepth;
+float distancePoint = 3.;
+float localRadius = 0.3;
+const float M_PI = 3.1415926535897932384626433832795;
+
+float luminance(float r, float g, float b){
+    return  (r * 0.3) + (g * 0.59) + (b * 0.11);
+}
+
+void main() {
+
+    vUv = uvs;
+    float ratio = height/width;
+    gl_PointSize = 19.;
+    vec4 dMap = texture2D( depthMap, uvs) ;
+    vec4 img = texture2D( originalImage, uvs) ;
+    float lumi = luminance(img.r, img.g, img.b);
+    vec3 pos = distancePoint * vec3(uvs.x - 0.5, (uvs.y - 0.5) * ratio - 0.25, 1. + lumi / 40.);
+    pos.xyz *= 0.65;  // Reduce long portrait sample (todo automatic)
+    vDepth = dMap.r;
+
+    vec3 originalPhotoPos = vec3(position.x, position.y - 2., position.z + 6.); // Starting position
+    vec3 interpolatedPos = mix(originalPhotoPos, pos, min( /*position.x*/ + (lumi + 0.2) / 10. * time * 15., 1.));
+
+    // Particles Continuous animation
+    // Depends on the distance to the viewer
+    // vec3 camPos = viewMatrix[3].xyz;
+    // float distToCam = distance(interpolatedPos, camPos /*cameraPosition*/ ) * 1.;
+    // interpolatedPos += distToCam / 5.;
+    interpolatedPos += (position / 60.) * (sin(position.y * time * 20.) * 2. )  / time;
+    // interpolatedPos += (position / 60.) * (position.y + sin(time * 0.2 * M_PI ) );
+      gl_PointSize +=  4. * sin(uvs.y + time * 0.5 * M_PI) ;
+
+
+    if(optionMode == 1){  // Mode for particles to circle at bottom
+        if(uvs.y < 0.1) {
+            float alpha = time * 6. + position.x * 10.;
+            float x = (localRadius + position.z / 5.) * cos(alpha);
+            float z = (localRadius + position.z / 5.) * sin(alpha);
+            interpolatedPos += vec3(x, interpolatedPos.y/8. + 0., z + 0.);
+            // gl_PointSize = 8.;
+        }
+    }
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(interpolatedPos, 1.0 );
+}

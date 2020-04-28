@@ -1,0 +1,29 @@
+#extension GL_EXT_shader_texture_lod : enable
+#extension GL_OES_standard_derivatives : enable
+
+uniform float time;
+uniform sampler2D originalImage;
+uniform sampler2D depthMap;
+varying vec2 vUv;
+varying float vDepth;
+
+
+void main() {
+
+    vec4 pointSpriteTexture = texture2D( originalImage, vUv );
+    vec4 earthMap = texture2D( depthMap, vUv ) ;
+    gl_FragColor =  pointSpriteTexture;
+    // gl_FragColor.a = vDepth * 0.7;
+    // if(vDepth < 0.5) gl_FragColor.a = 0.05 * (4. - time *2.);   // To make original pic with people out disappear
+    float r = 0.0, delta = 0.0, alpha = 1.0;
+    vec2 cxy = 2.0 * gl_PointCoord - 1.0;
+    r = dot(cxy, cxy);
+    // #ifdef GL_OES_standard_derivatives
+        delta = fwidth(r);
+        alpha = 1.0 - smoothstep(1.0 - delta, 1.0 + delta, r);
+    // #endif
+
+    gl_FragColor *= alpha;
+
+
+}
