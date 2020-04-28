@@ -1,25 +1,25 @@
 var net;
 var scene = new THREE.Scene();
 var renderer;
-var time = 0;
 var particles;
 var camera;
+var aframeScene;
 var shaderMaterialParticles;
 var textureOriginal = new THREE.Texture();
 var textureDepthMap = new THREE.Texture();
+var imageCapture;
 
 function capture() {
-  const canvas = document.getElementById('canvas');
-  const video = document.querySelector('video');
+  imageCapture.grabFrame().then((imageBitmap) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = imageBitmap.width;
+    canvas.height = imageBitmap.height;
+    canvas.getContext('2d').drawImage(imageBitmap, 0, 0);
+    textureOriginal = new THREE.Texture(canvas);
+    textureOriginal.needsUpdate = true;
 
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-
-  textureOriginal = new THREE.Texture(canvas);
-  textureOriginal.needsUpdate = true;
-
-  loadAndPredict(textureOriginal.image);
+    loadAndPredict(textureOriginal.image);
+  });
 }
 
 async function loadModel(){
@@ -39,18 +39,10 @@ async function loadAndPredict(img) {
   createTextureAndParticlesFromSegmentation(segmentation);
 }
 
-function animate() {
-  renderer.setAnimationLoop(render);
-}
-
-function render() {
-  time += 0.01;
-  particles.material.uniforms.time.value = time ;
-  renderer.render(scene, camera);
-}
-
 function createTextureAndParticlesFromSegmentation(seg) {
-  if(particles) scene.remove(particles);
+  if(particles) {
+    aframeScene.removeObject3D('particle-system');
+  }
 
   var size = seg.width * seg.height;
   var data = new Uint8Array( 3 * size );
@@ -102,13 +94,15 @@ function createTextureAndParticlesFromSegmentation(seg) {
   particles.material.uniforms.time.value = time ;
   particles.material.uniforms.depthMap.value = textureSegmentation;
 
+  aframeScene.setObject3D('particle-system', particles);
+/*
   scene.add( particles );
-
-  animate();
+  animate(); */
 }
 
 function init() {
   loadModel();
+
 
   document.querySelector('a-scene').addEventListener('loaded', async () => {
     const responseFragmentShader = await fetch('./fragmentshaderParticle');
@@ -117,7 +111,9 @@ function init() {
     const responseVertexshaderParticle = await fetch('./vertexshaderParticle');
     const vertexshaderParticle = await responseVertexshaderParticle.text();
 
-    renderer = document.querySelector('a-scene').renderer;
+    aframeScene = document.querySelector('a-scene');
+
+    renderer = aframeScene.renderer;
     camera = document.querySelector('#camera').components.camera.camera;
 
     const uniforms = {
@@ -139,7 +135,12 @@ function init() {
       vertexColors: true
     });
 
-    document.body.addEventListener('click', () => {
+    aframeScene.addEventListener('click', () => {
+      if (!imageCapture) {
+        const mediaStream = document.querySelector('video').srcObject;
+        imageCapture = new ImageCapture(mediaStream.getVideoTracks()[0]);
+      }
+
       if (net) {
         capture();
       }

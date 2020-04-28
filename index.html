@@ -8,15 +8,25 @@
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.0"></script>
     <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <script src="https://unpkg.com/aframe-particle-system-component@1.0.x/dist/aframe-particle-system-component.min.js"></script>
+    <script src="./components.js"></script>
+    <link type="text/css" rel="stylesheet" href="main.css">
   </head>
   <body style="margin: 0; overflow: hidden;">
-    <script type="x-shader/x-vertex" id="vertexshaderParticle"></script>
-    <script type="x-shader/x-fragment" id="fragmentshaderParticle"></script>
     <a-scene
+      holograma
       vr-mode-ui="enabled: false"
-      embedded
-      arjs="sourceType: webcam; debugUIEnabled: false;">
-      <a-entity id="camera" camera></a-entity>
+      webxr="requiredFeatures: local;
+      optionalFeatures: unbounded;">
+      <!-- <a-box position="-1 0.5 -3" rotation="0 45 0" color="#4CC3D9"></a-box> -->
+      <!-- <a-entity position="-1 0.5 -3" particle-system="color: #EF0000,#44CC00"></a-entity> -->
+      <a-entity position="-1 0.5 -3" ></a-entity>
+      <a-camera
+        id="camera"
+        fov="70"
+        far="500"
+        near="0.1">
+      </a-camera>
     </a-scene>
     <canvas id="canvas" style="overflow:auto"></canvas>
     <script src="./main.js"></script>
