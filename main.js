@@ -1,4 +1,9 @@
 async function capture() {
+  if (!globalScene.imageCapture) {
+    const mediaStream = document.querySelector('video').srcObject;
+    globalScene.imageCapture = new ImageCapture(mediaStream.getVideoTracks()[0]);
+  }
+
   const imageBitmap = await globalScene.imageCapture.grabFrame();
   const canvas = document.createElement('canvas');
   canvas.width = imageBitmap.width;
@@ -36,7 +41,7 @@ function createTextureAndParticlesFromSegmentation(seg) {
 
   const size = seg.width * seg.height;
   const data = new Uint8Array(3 * size);
-  subsamplingFactor = 4;
+  const subsamplingFactor = 4;
   const w = seg.width;
   const h = seg.height;
   const geometry = new THREE.BufferGeometry();
@@ -114,33 +119,21 @@ function createTextureAndParticlesFromSegmentation(seg) {
   globalScene.aframeScene.appendChild(entityEl);
 }
 
-function init() {
-  loadModel();
+async function init() {
+  await loadModel();
 
+  const responseFragmentShader = await fetch('./fragmentshaderParticle');
+  globalScene.fragmentShader = await responseFragmentShader.text();
 
-  document.querySelector('a-scene').addEventListener('loaded', async () => {
-    const responseFragmentShader = await fetch('./fragmentshaderParticle');
-    globalScene.fragmentShader = await responseFragmentShader.text();
+  const responseVertexshaderParticle = await fetch('./vertexshaderParticle');
+  globalScene.vertexshaderParticle = await responseVertexshaderParticle.text();
 
-    const responseVertexshaderParticle = await fetch('./vertexshaderParticle');
-    globalScene.vertexshaderParticle = await responseVertexshaderParticle.text();
+  globalScene.aframeScene = document.querySelector('a-scene');
 
-    globalScene.aframeScene = document.querySelector('a-scene');
+  globalScene.renderer = globalScene.aframeScene.renderer;
+  globalScene.camera = document.querySelector('a-camera');
 
-    globalScene.renderer = globalScene.aframeScene.renderer;
-    globalScene.camera = document.querySelector('#camera');
-
-    globalScene.aframeScene.addEventListener('click', () => {
-      if (!globalScene.imageCapture) {
-        const mediaStream = document.querySelector('video').srcObject;
-        globalScene.imageCapture = new ImageCapture(mediaStream.getVideoTracks()[0]);
-      }
-
-      if (globalScene.net) {
-        capture();
-      }
-    });
-  })
+  globalScene.aframeScene.addEventListener('click', () => capture());
 }
 
-init();
+document.querySelector('a-scene').addEventListener('loaded', init());
