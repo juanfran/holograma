@@ -1,10 +1,8 @@
-var time = 0;
 
 AFRAME.registerComponent('holograma', {
-  tick: function(_time, _dt) {
-    if (particles) {
-      time += 0.01;
-      particles.material.uniforms.time.value = time ;
+  tick: () => {
+    if (globalScene.particles) {
+      globalScene.particles.material.uniforms.time.value += 0.01;
     }
   },
 });

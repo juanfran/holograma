@@ -1,30 +1,18 @@
-var net;
-var renderer;
-var particles;
-var camera;
-var aframeScene;
-var textureOriginal = new THREE.Texture();
-var textureDepthMap = new THREE.Texture();
-var imageCapture;
-var fragmentShader;
-var vertexshaderParticle;
+async function capture() {
+  const imageBitmap = await globalScene.imageCapture.grabFrame();
+  const canvas = document.createElement('canvas');
+  canvas.width = imageBitmap.width;
+  canvas.height = imageBitmap.height;
+  canvas.getContext('2d').drawImage(imageBitmap, 0, 0);
+  globalScene.textureOriginal = new THREE.Texture(canvas);
+  globalScene.textureOriginal.needsUpdate = true;
 
-function capture() {
-  imageCapture.grabFrame().then((imageBitmap) => {
-    const canvas = document.createElement('canvas');
-    canvas.width = imageBitmap.width;
-    canvas.height = imageBitmap.height;
-    canvas.getContext('2d').drawImage(imageBitmap, 0, 0);
-    textureOriginal = new THREE.Texture(canvas);
-    textureOriginal.needsUpdate = true;
-
-    loadAndPredict(textureOriginal.image);
-  });
+  await loadAndPredict(globalScene.textureOriginal.image);
 }
 
 async function loadModel(){
   // Load the model
-  net = await bodyPix.load({
+  globalScene.net = await bodyPix.load({
     architecture: 'MobileNetV1',
     outputStride: 16,
     multiplier: 0.75,
@@ -35,25 +23,28 @@ async function loadModel(){
 }
 
 async function loadAndPredict(img) {
-  const segmentation = await net.segmentPerson(img);
+  const segmentation = await globalScene.net.segmentPerson(img);
   createTextureAndParticlesFromSegmentation(segmentation);
 }
 
 function createTextureAndParticlesFromSegmentation(seg) {
-  if(particles) {
-    aframeScene.removeObject3D('particle-system');
+  if (globalScene.particles) {
+    aframeScene.removeChild(
+      document.querySelector('[holograma]')
+    );
   }
 
-  var size = seg.width * seg.height;
-  var data = new Uint8Array(3 * size);
+  const size = seg.width * seg.height;
+  const data = new Uint8Array(3 * size);
   subsamplingFactor = 4;
-  var w = seg.width;
-  var h = seg.height;
-  var geometry = new THREE.BufferGeometry();
-  var positions = [];
-  var uvs = [];
-  var u,v;
-  var nAdded = 0;
+  const w = seg.width;
+  const h = seg.height;
+  const geometry = new THREE.BufferGeometry();
+  const positions = [];
+  const uvs = [];
+
+  let nAdded = 0;
+  let u,v;
 
   for (var i = 0; i < size; i ++) {
     // Texture part
@@ -75,11 +66,11 @@ function createTextureAndParticlesFromSegmentation(seg) {
   }
 
   const worldPosition = new THREE.Vector3();
-  camera.object3D.getWorldPosition(worldPosition);
-  const worldQuaternion = new THREE.Quaternion();
-  camera.object3D.getWorldQuaternion(worldQuaternion);
-  const worldHeading = new THREE.Vector3();
-  camera.object3D.getWorldDirection(worldHeading);
+  globalScene.camera.object3D.getWorldPosition(worldPosition);
+  // const worldQuaternion = new THREE.Quaternion();
+  // globalScene.camera.object3D.getWorldQuaternion(worldQuaternion);
+  // const worldHeading = new THREE.Vector3();
+  // globalScene.camera.object3D.getWorldDirection(worldHeading);
 
   // Part particles
   geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
@@ -91,36 +82,36 @@ function createTextureAndParticlesFromSegmentation(seg) {
       userPos: {value: worldPosition},
       width: {value: 1},
       height: {value: 1},
-      time: {value: time},
-      originalImage: { value: textureOriginal },
-      depthMap: { value: textureDepthMap}
+      time: {value: 0},
+      originalImage: { value: globalScene.textureOriginal },
+      depthMap: { value: globalScene.textureDepthMap}
     },
-    vertexShader: vertexshaderParticle,
-    fragmentShader: fragmentShader,
+    vertexShader: globalScene.vertexshaderParticle,
+    fragmentShader: globalScene.fragmentShader,
     depthTest: false,
     transparent: true,
     vertexColors: true
   });
 
-  particles = new THREE.Points(geometry, shaderMaterialParticles);
-  particles.material.uniforms.originalImage.value = textureOriginal;
-  particles.position.z = -4;
-  particles.position.y = 1;
-  particles.frustumCulled = false;
-  particles.material.uniforms.width.value = w;
-  particles.material.uniforms.height.value = h;
+  globalScene.particles = new THREE.Points(geometry, shaderMaterialParticles);
+  globalScene.particles.material.uniforms.originalImage.value = globalScene.textureOriginal;
+  globalScene.particles.position.z = -4;
+  globalScene.particles.position.y = 1;
+  globalScene.particles.frustumCulled = false;
+  globalScene.particles.material.uniforms.width.value = w;
+  globalScene.particles.material.uniforms.height.value = h;
 
   // Part texture
   textureSegmentation = new THREE.DataTexture(data, seg.width, seg.height, THREE.RGBFormat);
   textureSegmentation.flipY = true;
-  time = 0;
-  particles.material.uniforms.time.value = time;
-  particles.material.uniforms.depthMap.value = textureSegmentation;
+  globalScene.particles.material.uniforms.time.value = 0;
+  globalScene.particles.material.uniforms.depthMap.value = textureSegmentation;
 
-  var entityEl = document.createElement('a-entity');
-  entityEl.setObject3D('particle-system', particles);
+  const entityEl = document.createElement('a-entity');
+  entityEl.setAttribute('holograma', '');
+  entityEl.setObject3D('particle-system', globalScene.particles);
 
-  aframeScene.appendChild(entityEl);
+  globalScene.aframeScene.appendChild(entityEl);
 }
 
 function init() {
@@ -129,23 +120,23 @@ function init() {
 
   document.querySelector('a-scene').addEventListener('loaded', async () => {
     const responseFragmentShader = await fetch('./fragmentshaderParticle');
-    fragmentShader = await responseFragmentShader.text();
+    globalScene.fragmentShader = await responseFragmentShader.text();
 
     const responseVertexshaderParticle = await fetch('./vertexshaderParticle');
-    vertexshaderParticle = await responseVertexshaderParticle.text();
+    globalScene.vertexshaderParticle = await responseVertexshaderParticle.text();
 
-    aframeScene = document.querySelector('a-scene');
+    globalScene.aframeScene = document.querySelector('a-scene');
 
-    renderer = aframeScene.renderer;
-    camera = document.querySelector('#camera');
+    globalScene.renderer = globalScene.aframeScene.renderer;
+    globalScene.camera = document.querySelector('#camera');
 
-    aframeScene.addEventListener('click', () => {
-      if (!imageCapture) {
+    globalScene.aframeScene.addEventListener('click', () => {
+      if (!globalScene.imageCapture) {
         const mediaStream = document.querySelector('video').srcObject;
-        imageCapture = new ImageCapture(mediaStream.getVideoTracks()[0]);
+        globalScene.imageCapture = new ImageCapture(mediaStream.getVideoTracks()[0]);
       }
 
-      if (net) {
+      if (globalScene.net) {
         capture();
       }
     });
