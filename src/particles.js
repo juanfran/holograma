@@ -1,37 +1,3 @@
-async function capture() {
-  if (!globalScene.imageCapture) {
-    const mediaStream = document.querySelector('video').srcObject;
-    globalScene.imageCapture = new ImageCapture(mediaStream.getVideoTracks()[0]);
-  }
-
-  const imageBitmap = await globalScene.imageCapture.grabFrame();
-  const canvas = document.createElement('canvas');
-  canvas.width = imageBitmap.width;
-  canvas.height = imageBitmap.height;
-  canvas.getContext('2d').drawImage(imageBitmap, 0, 0);
-  globalScene.textureOriginal = new THREE.Texture(canvas);
-  globalScene.textureOriginal.needsUpdate = true;
-
-  await loadAndPredict(globalScene.textureOriginal.image);
-}
-
-async function loadModel(){
-  // Load the model
-  globalScene.net = await bodyPix.load({
-    architecture: 'MobileNetV1',
-    outputStride: 16,
-    multiplier: 0.75,
-    quantBytes: 2,
-    internalResolution: 'medium',
-    segmentationThreshold: 0.7
-  });
-}
-
-async function loadAndPredict(img) {
-  const segmentation = await globalScene.net.segmentPerson(img);
-  createTextureAndParticlesFromSegmentation(segmentation);
-}
-
 function createTextureAndParticlesFromSegmentation(seg) {
   if (globalScene.particles) {
     aframeScene.removeChild(
@@ -39,19 +5,17 @@ function createTextureAndParticlesFromSegmentation(seg) {
     );
   }
 
-  const size = seg.width * seg.height;
-  const data = new Uint8Array(3 * size);
-  const subsamplingFactor = 4;
   const w = seg.width;
   const h = seg.height;
+  const size = w * h;
+  const data = new Uint8Array(3 * size);
+  const subsamplingFactor = 4;
   const geometry = new THREE.BufferGeometry();
   const positions = [];
   const uvs = [];
-
-  let nAdded = 0;
   let u,v;
 
-  for (var i = 0; i < size; i ++) {
+  for (let i = 0; i < size; i ++) {
     // Texture part
     var stride = i * 3;
     data[stride] = seg.data[i] * 255;
@@ -59,14 +23,13 @@ function createTextureAndParticlesFromSegmentation(seg) {
     data[stride + 2] = seg.data[i];
 
     // Particles part. We test if People or not to create a particle
-    if(seg.data[i] > 0){
-        if(nAdded % subsamplingFactor == 0){
-            u = (i % w ) / w;
-            v = Math.floor(i / w) / h;
-            positions.push(Math.random(), Math.random(), Math.random());
-            uvs.push(u, 1. - v);  // flip y
-        }
-        nAdded++;
+    if (seg.data[i] > 0){
+      if(i % subsamplingFactor === 0) {
+          u = (i % w ) / w;
+          v = Math.floor(i / w) / h;
+          positions.push(Math.random(), Math.random(), Math.random());
+          uvs.push(u, 1. - v);  // flip y
+      }
     }
   }
 
@@ -118,22 +81,3 @@ function createTextureAndParticlesFromSegmentation(seg) {
 
   globalScene.aframeScene.appendChild(entityEl);
 }
-
-async function init() {
-  await loadModel();
-
-  const responseFragmentShader = await fetch('./fragmentshaderParticle');
-  globalScene.fragmentShader = await responseFragmentShader.text();
-
-  const responseVertexshaderParticle = await fetch('./vertexshaderParticle');
-  globalScene.vertexshaderParticle = await responseVertexshaderParticle.text();
-
-  globalScene.aframeScene = document.querySelector('a-scene');
-
-  globalScene.renderer = globalScene.aframeScene.renderer;
-  globalScene.camera = document.querySelector('a-camera');
-
-  globalScene.aframeScene.addEventListener('click', () => capture());
-}
-
-document.querySelector('a-scene').addEventListener('loaded', init());
